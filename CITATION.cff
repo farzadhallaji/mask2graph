@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use maskgraph, please cite this software."
+title: "maskgraph"
+version: "0.1.0a0"
+type: software
+authors:
+  - family-names: "Hallaji"
+    given-names: "Farzad"
+repository-code: "https://github.com/farzadhallaji/mask2graph"
+license: "MIT"
