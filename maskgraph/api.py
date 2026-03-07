@@ -25,7 +25,7 @@ def _library_version() -> str:
     try:
         return pkg_version("maskgraph")
     except Exception:  # noqa: BLE001
-        return "0.1.0a0"
+        return "0.1.0"
 
 
 def _validate_input(mask: NDArray[np.generic], spacing: tuple[float, ...] | None) -> tuple[NDArray[np.bool_], tuple[float, ...]]:

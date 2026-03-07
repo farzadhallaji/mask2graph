@@ -10,6 +10,7 @@ from .api import (
     skeletonize_mask,
 )
 from .config import CleanupConfig, ExtractConfig
+from .networkx_utils import to_networkx
 from .serialize import from_json, to_json
 from .types import (
     DebugArtifacts,
@@ -40,4 +41,5 @@ __all__ = [
     "preprocess_mask",
     "skeletonize_mask",
     "to_json",
+    "to_networkx",
 ]

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "maskgraph"
-version = "0.1.0a0"
-description = "Alpha: deterministic binary mask to graph extraction."
+version = "0.1.0"
+description = "Deterministic 2D/3D binary mask to geometric graph extraction."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -21,7 +21,7 @@ keywords = [
   "3d-imaging",
 ]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
@@ -37,6 +37,9 @@ Issues = "https://github.com/farzadhallaji/mask2graph/issues"
 [project.optional-dependencies]
 dev = [
   "pytest==8.3.5",
+]
+interop = [
+  "networkx",
 ]
 
 [project.scripts]

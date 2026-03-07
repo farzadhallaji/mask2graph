@@ -1,31 +1,20 @@
-# maskgraph (alpha)
+# maskgraph
 
-Deterministically convert 2D/3D binary masks into geometric graphs (nodes, edges, radii, and metadata) with conservative defaults suitable for scientific and production workflows.
+`maskgraph` converts 2D/3D binary masks into deterministic geometric graphs (nodes, edges, radii, and metadata) for downstream analysis, simulation, and learning systems.
 
-`maskgraph` is currently **alpha**: it is usable and tested on representative synthetic and real masks, but APIs/config defaults may still evolve.
+## Why maskgraph
 
-## Why this exists
+Most mask-to-graph pipelines fail at dense junctions, lose loops, or produce unstable IDs across runs. `maskgraph` is built for reproducibility and explicit topology handling:
 
-Most mask-to-graph pipelines lose loops, behave inconsistently at dense junctions, or return unstable output ordering.  
-`maskgraph` focuses on:
+- deterministic output ordering and JSON payloads
+- loop/self-loop preservation
+- one API for 2D and 3D masks
+- spacing-aware cleanup and geometry
+- auditable debug artifacts
 
-- deterministic output (stable IDs/order/JSON bytes),
-- loop-preserving extraction,
-- one API for both 2D and 3D masks,
-- optional debug artifacts for inspection.
+## Pipeline
 
-## Publish-ready contract
-
-`maskgraph` is designed around an explicit two-layer cleanup strategy:
-
-- **Layer 1 (mask)**: conservative, spacing-aware cleanup for likely annotation noise only
-- **Layer 2 (graph)**: iterative artifact cleanup after tracing (junction stabilization, spur/cycle cleanup, short-edge contraction)
-
-This keeps mask cleanup topology-conservative and moves topology edits to explicit graph-side operators.
-
-## Visual pipeline
-
-Pipeline: `binary mask -> conservative cleanup -> skeleton -> junction stabilization -> node/edge tracing -> iterative graph normalization`.
+`binary mask -> conservative mask cleanup -> skeleton -> junction stabilization -> node/edge tracing -> iterative graph normalization`
 
 Real-mask overlay notebook (Mass Roads): `mass_roads_graph_overlay.ipynb`.
 
@@ -43,97 +32,77 @@ From GitHub:
 python -m pip install "git+https://github.com/farzadhallaji/mask2graph.git"
 ```
 
-## 10-line example
+Install optional NetworkX interoperability dependency:
+
+```bash
+python -m pip install -e ".[interop]"
+```
+
+## Quickstart
 
 ```python
 import numpy as np
-from maskgraph import extract_graph
+from maskgraph import ExtractConfig, extract_graph, to_json
 
 mask = np.zeros((11, 11), dtype=np.uint8)
 mask[5, 2:9] = 1
 mask[2:6, 5] = 1
 
-graph = extract_graph(mask, spacing=(1.0, 1.0))
-print(len(graph.nodes), len(graph.edges))
-print(graph.nodes[0].type, graph.edges[0].length)
-```
-
-## API quickstart
-
-```python
-from maskgraph import ExtractConfig, extract_graph, to_json
-
 cfg = ExtractConfig()
 cfg.cleanup.max_hole_size = 16.0
 cfg.cleanup.max_hole_radius = 1.5
 cfg.normalize.junction_dilation_iters = 1
 cfg.normalize.prune_spurs_below = 8.0
+
 graph = extract_graph(mask, config=cfg, spacing=(1.0, 1.0))
 payload = to_json(graph)
+print(len(graph.nodes), len(graph.edges), len(payload))
 ```
 
-## Conservative cleanup
+## Conservative cleanup contract
 
-Cleanup is optional and topology-conservative by default. The default cleanup config is effectively no-op unless you opt in with thresholds.
+Mask cleanup is optional and topology-conservative by default. It is intentionally limited to:
 
-- removes tiny disconnected foreground components (`min_object_size`)
-- fills tiny enclosed background holes (`max_hole_size` and `max_hole_radius`)
-- uses full connectivity (8-neighbor in 2D, 26-neighbor in 3D)
-- uses physical units when `spacing` is provided
+- tiny disconnected foreground removal (`min_object_size`)
+- tiny enclosed background hole fill (`max_hole_size`, `max_hole_radius`)
 
-Cleanup does not do branch separation, hole carving, global erosion/dilation, or aggressive morphology.
-Those are topology-editing operations and should be explicit downstream choices.
+It does not perform global opening/closing, branch separation, or hole carving. Those are topology-editing operations and should be explicit downstream choices.
+
+When `return_debug=True`, `DebugArtifacts.cleanup_report` returns counts and physical-size/radius metrics for every cleanup action.
+
+## Graph-side normalization
+
+Residual tracing artifacts are handled in graph space:
+
+- junction-region stabilization (`junction_dilation_iters`)
+- short spur pruning (`prune_spurs_below`)
+- tiny-cycle removal (`min_cycle_length`, `max_cycle_area`, `cycle_length_to_radius_ratio`)
+- short internal-edge contraction (`contract_short_edges_below`)
+- bounded iterative cleanup (`normalization_max_iter`)
+
+This separation keeps mask repair conservative while still allowing robust post-trace cleanup.
+
+## NetworkX interoperability
+
+Use `to_networkx(...)` to bridge into the NetworkX ecosystem.
 
 ```python
-from maskgraph import ExtractConfig
+from maskgraph import to_networkx
 
-cfg = ExtractConfig()
-cfg.cleanup.min_object_size = 4.0
-cfg.cleanup.max_hole_size = 16.0
-cfg.cleanup.max_hole_radius = 1.5
+nx_graph = to_networkx(graph, multigraph=True)
+print(nx_graph.number_of_nodes(), nx_graph.number_of_edges())
 ```
 
-When `return_debug=True`, `DebugArtifacts.cleanup_report` provides counts and physical sizes/radii for auditable cleanup changes.
-
-## Graph-side artifact cleanup
-
-Residual topology artifacts are handled after tracing at the graph stage, not by aggressive mask morphology:
-
-- stabilizes junction neighborhoods by region-based node candidates (`junction_dilation_iters`)
-- prunes short spurs (`prune_spurs_below`)
-- removes tiny cycles (`min_cycle_length`, `max_cycle_area`, `cycle_length_to_radius_ratio`)
-- contracts short internal edges around unstable junctions (`contract_short_edges_below`)
-- iterates normalization until stable or `normalization_max_iter` is reached
-
-Default normalization values are conservative (mostly disabled) so behavior remains predictable unless users opt in.
-
-```python
-from maskgraph import ExtractConfig
-
-cfg = ExtractConfig()
-cfg.normalize.junction_dilation_iters = 1
-cfg.normalize.prune_spurs_below = 8.0
-cfg.normalize.min_cycle_length = 12.0
-cfg.normalize.max_cycle_area = 16.0
-cfg.normalize.cycle_length_to_radius_ratio = 8.0
-cfg.normalize.contract_short_edges_below = 2.0
-cfg.normalize.normalization_max_iter = 8
-```
-
-This split is intentional:
-
-- mask cleanup repairs likely annotation noise
-- graph cleanup removes residual skeletonization/tracing artifacts
-- topology-editing operators (carving/separation/opening/closing) are not part of default cleanup behavior
+`multigraph=True` preserves parallel edges and self-loops. Node and edge attributes include geometry and topology metadata from `MaskGraph`.
 
 ## Output schema
 
-Serialized payload (`to_json`) has:
+Serialized payload (`to_json`) includes:
 
-- `schema_version` (`"1"`),
-- `meta`: version, ndim, shape, spacing, config snapshot, input hashes,
-- `nodes[]`: `id`, `xyz`, `index`, `type`, `degree`, `voxel_count`, optional radii,
-- `edges[]`: `id`, `u`, `v`, `path_xyz`, `path_index`, `length`, `voxel_length`, optional radii/profile, `is_self_loop`.
+- `schema_version`
+- `meta`: version, ndim, shape, spacing, config snapshot, input hashes
+- `nodes[]`: ids, geometry, topology labels, optional radii
+- `edges[]`: connectivity, path geometry/index, lengths, optional radii/profile, loop flag
 
 See `maskgraph/types.py` and `maskgraph/serialize.py` for exact fields.
 
@@ -143,29 +112,13 @@ See `maskgraph/types.py` and `maskgraph/serialize.py` for exact fields.
 - `examples/example_2d_loop.py`
 - `examples/example_3d_branch.py`
 
-## Test status
+## Validation
 
-Run:
+Run tests:
 
 ```bash
 python -m pytest -q
 ```
-
-CI workflow setup is prepared, but GitHub Actions is not yet enabled in this repository push because the publishing token did not include `workflow` scope.
-
-## Limitations (alpha)
-
-- focused on thin-structure masks (roads, vessels, neurites, similar morphology),
-- not yet benchmarked across broad public datasets with published error bars,
-- no dedicated CLI configuration surface yet (CLI uses defaults),
-- performance optimization for very large 3D volumes is still early-stage.
-
-## Roadmap
-
-- richer CLI/config overrides,
-- broader dataset regression suite (2D/3D),
-- algorithmic/parameter docs with recommended presets,
-- improved large-volume performance and memory behavior.
 
 ## Contributing
 
