@@ -59,6 +59,112 @@ payload = to_json(graph)
 print(len(graph.nodes), len(graph.edges), len(payload))
 ```
 
+## Configuration reference
+
+`ExtractConfig` has five groups: `cleanup`, `skeleton`, `normalize`, `simplify`, and `determinism`.
+
+All size/length/area thresholds are interpreted in the same units as `spacing` passed to `extract_graph(...)`.
+If `spacing=(1, 1)` they behave like pixel units; with physical spacing they behave in physical units.
+
+### `cleanup` (`CleanupConfig`)
+
+Conservative mask repair before skeletonization.
+
+- `enabled` (`bool`, default `True`): turns cleanup stage on/off as a whole.
+- `min_object_size` (`float`, default `0.0`): removes tiny disconnected foreground components below this area/volume.
+- `max_hole_size` (`float`, default `0.0`): fills enclosed holes up to this area/volume.
+- `max_hole_radius` (`float`, default `0.0`): fills enclosed holes up to this max inscribed radius.
+
+Practical guidance:
+
+- Start with `0.0` values for strict no-op behavior.
+- For road masks, often useful as a starting point:
+  - `min_object_size=4..16`
+  - `max_hole_size=9..49`
+  - `max_hole_radius=1.0..2.5`
+- If narrow separators are getting filled, reduce `max_hole_radius` first.
+
+### `skeleton` (`SkeletonConfig`)
+
+Skeletonization backend selection.
+
+- `method_2d` (`str`, default `"zhang"`): 2D skeleton method.
+- `method_3d` (`str`, default `"lee"`): 3D skeleton method.
+
+Practical guidance:
+
+- Keep defaults unless benchmarking shows a clear dataset-specific advantage.
+
+### `normalize` (`NormalizeConfig`)
+
+Graph-side artifact cleanup after tracing.
+
+- `junction_dilation_iters` (`int`, default `0`): expands junction seed regions on the skeleton before clustering into logical nodes.
+- `min_component_length` (`float`, default `0.0`): removes connected graph components shorter than this total edge length.
+- `prune_spurs_below` (`float`, default `0.0`): prunes short dangling spur edges below this length.
+- `min_cycle_length` (`float`, default `0.0`): enables tiny-cycle filtering by max cycle length.
+- `max_cycle_area` (`float`, default `0.0`): adds area gate for tiny-cycle filtering (2D area gate).
+- `cycle_length_to_radius_ratio` (`float`, default `0.0`): removes cycles whose length is small relative to local radius (helps suppress tiny bubble loops).
+- `contract_short_edges_below` (`float`, default `0.0`): contracts short internal edges (mostly junction clutter).
+- `normalization_max_iter` (`int`, default `10`): max outer iterations for iterative cleanup.
+- `prune_iterations` (`int`, default `100`): max internal iterations for spur pruning.
+- `contract_degree2` (`bool`, default `True`): contracts degree-2 chains into longer geometric edges.
+
+Practical guidance:
+
+- If you see red-node clusters at junctions:
+  - increase `junction_dilation_iters` to `1..3`
+  - then raise `contract_short_edges_below`.
+- If tiny whiskers remain:
+  - increase `prune_spurs_below`.
+- If micro-loops remain:
+  - tune `min_cycle_length`, then `max_cycle_area`, then `cycle_length_to_radius_ratio`.
+
+### `simplify` (`SimplifyConfig`)
+
+Optional geometric simplification of edge polylines.
+
+- `enabled` (`bool`, default `False`): toggles simplification.
+- `epsilon` (`float`, default `0.0`): simplification tolerance.
+
+Practical guidance:
+
+- Use only when you need lighter polylines for export/visualization.
+- Keep disabled if exact sampled geometry is important for downstream metrics.
+
+### `determinism` (`DeterminismConfig`)
+
+Output stability controls.
+
+- `float_decimals` (`int`, default `6`): rounding precision for floating values.
+- `sort_nodes` (`bool`, default `True`): deterministic node ordering/reindexing.
+- `sort_edges` (`bool`, default `True`): deterministic edge ordering/reindexing.
+
+Practical guidance:
+
+- Keep defaults for reproducible JSON outputs and stable diffs.
+- Lower `float_decimals` only if payload size matters more than precision.
+
+### Example production profile (roads)
+
+```python
+from mask2graph import ExtractConfig
+
+cfg = ExtractConfig()
+cfg.cleanup.min_object_size = 9.0
+cfg.cleanup.max_hole_size = 36.0
+cfg.cleanup.max_hole_radius = 2.0
+
+cfg.normalize.junction_dilation_iters = 2
+cfg.normalize.prune_spurs_below = 10.0
+cfg.normalize.min_component_length = 25.0
+cfg.normalize.min_cycle_length = 16.0
+cfg.normalize.max_cycle_area = 24.0
+cfg.normalize.cycle_length_to_radius_ratio = 6.0
+cfg.normalize.contract_short_edges_below = 3.0
+cfg.normalize.normalization_max_iter = 10
+```
+
 ## Conservative cleanup contract
 
 Mask cleanup is optional and topology-conservative by default. It is intentionally limited to:
