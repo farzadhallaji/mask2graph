@@ -2,6 +2,8 @@
 
 `mask2graph` converts 2D/3D binary masks into deterministic geometric graphs (nodes, edges, radii, and metadata) for downstream analysis, simulation, and learning systems.
 
+<img width="1280" height="1278" alt="image" src="https://github.com/user-attachments/assets/823138e9-a4a2-4c28-93b6-72dfed814737" />
+
 ## Why mask2graph
 
 Most mask-to-graph pipelines fail at dense junctions, lose loops, or produce unstable IDs across runs. `mask2graph` is built for reproducibility and explicit topology handling:
