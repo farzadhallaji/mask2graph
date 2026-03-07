@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0 - 2026-03-07
+
+Breaking release with package rename and stable API baseline:
+
+- package name changed from `maskgraph` to `mask2graph`,
+- import path changed to `mask2graph` only (no compatibility alias),
+- deterministic 2D/3D extraction, conservative cleanup, and graph normalization pipeline retained,
+- NetworkX interoperability via `to_networkx(...)` included.
+
+Migration note:
+
+- Replace all imports such as `from maskgraph import ...` with `from mask2graph import ...`.
+
 ## 0.1.0 - 2026-03-07
 
 First stable release:

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from maskgraph.config import NormalizeConfig, SimplifyConfig
-from maskgraph.normalize import normalize_graph
-from maskgraph.types import Edge, GraphMeta, MaskGraph, Node
+from mask2graph.config import NormalizeConfig, SimplifyConfig
+from mask2graph.normalize import normalize_graph
+from mask2graph.types import Edge, GraphMeta, MaskGraph, Node
 
 
 def _meta(ndim: int = 2) -> GraphMeta:

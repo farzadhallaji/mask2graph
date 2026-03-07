@@ -3,8 +3,8 @@ requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "maskgraph"
-version = "0.1.0"
+name = "mask2graph"
+version = "1.0.0"
 description = "Deterministic 2D/3D binary mask to geometric graph extraction."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -43,7 +43,7 @@ interop = [
 ]
 
 [project.scripts]
-maskgraph = "maskgraph.cli:main"
+mask2graph = "mask2graph.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

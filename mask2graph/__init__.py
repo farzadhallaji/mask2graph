@@ -1,4 +1,4 @@
-"""Public package exports for maskgraph."""
+"""Public package exports for mask2graph."""
 
 from .api import (
     compute_degree_map,

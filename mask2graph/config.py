@@ -1,4 +1,4 @@
-"""Configuration model for maskgraph extraction."""
+"""Configuration model for mask2graph extraction."""
 
 from __future__ import annotations
 

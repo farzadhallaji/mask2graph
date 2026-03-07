@@ -1,6 +1,6 @@
-# Contributing to maskgraph
+# Contributing to mask2graph
 
-Thanks for helping improve `maskgraph`.
+Thanks for helping improve `mask2graph`.
 
 ## Development setup
 

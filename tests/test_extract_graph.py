@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from maskgraph import (
+from mask2graph import (
     ExtractConfig,
     ExtractionError,
     extract_graph,
@@ -11,9 +11,9 @@ from maskgraph import (
     from_json,
     to_json,
 )
-from maskgraph.nodes import node_candidates_from_degree
-from maskgraph.utils.connectivity import label_components
-from maskgraph.skeleton import skeletonize_mask
+from mask2graph.nodes import node_candidates_from_degree
+from mask2graph.utils.connectivity import label_components
+from mask2graph.skeleton import skeletonize_mask
 
 
 def _line_mask_2d(length: int = 9) -> np.ndarray:

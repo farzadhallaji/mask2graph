@@ -1,10 +1,10 @@
-# maskgraph
+# mask2graph
 
-`maskgraph` converts 2D/3D binary masks into deterministic geometric graphs (nodes, edges, radii, and metadata) for downstream analysis, simulation, and learning systems.
+`mask2graph` converts 2D/3D binary masks into deterministic geometric graphs (nodes, edges, radii, and metadata) for downstream analysis, simulation, and learning systems.
 
-## Why maskgraph
+## Why mask2graph
 
-Most mask-to-graph pipelines fail at dense junctions, lose loops, or produce unstable IDs across runs. `maskgraph` is built for reproducibility and explicit topology handling:
+Most mask-to-graph pipelines fail at dense junctions, lose loops, or produce unstable IDs across runs. `mask2graph` is built for reproducibility and explicit topology handling:
 
 - deterministic output ordering and JSON payloads
 - loop/self-loop preservation
@@ -42,7 +42,7 @@ python -m pip install -e ".[interop]"
 
 ```python
 import numpy as np
-from maskgraph import ExtractConfig, extract_graph, to_json
+from mask2graph import ExtractConfig, extract_graph, to_json
 
 mask = np.zeros((11, 11), dtype=np.uint8)
 mask[5, 2:9] = 1
@@ -87,7 +87,7 @@ This separation keeps mask repair conservative while still allowing robust post-
 Use `to_networkx(...)` to bridge into the NetworkX ecosystem.
 
 ```python
-from maskgraph import to_networkx
+from mask2graph import to_networkx
 
 nx_graph = to_networkx(graph, multigraph=True)
 print(nx_graph.number_of_nodes(), nx_graph.number_of_edges())
@@ -104,7 +104,7 @@ Serialized payload (`to_json`) includes:
 - `nodes[]`: ids, geometry, topology labels, optional radii
 - `edges[]`: connectivity, path geometry/index, lengths, optional radii/profile, loop flag
 
-See `maskgraph/types.py` and `maskgraph/serialize.py` for exact fields.
+See `mask2graph/types.py` and `mask2graph/serialize.py` for exact fields.
 
 ## Examples
 

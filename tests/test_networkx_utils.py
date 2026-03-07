@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from maskgraph import ExtractConfig, extract_graph, to_networkx
-from maskgraph.types import Edge, MaskGraph
+from mask2graph import ExtractConfig, extract_graph, to_networkx
+from mask2graph.types import Edge, MaskGraph
 
 nx = pytest.importorskip("networkx")
 
@@ -64,7 +64,7 @@ def test_to_networkx_multiedge_semantics():
 
 
 def gnode(node_id: int, xyz: tuple[float, float, float], index: tuple[int, int]):
-    from maskgraph.types import Node
+    from mask2graph.types import Node
 
     return Node(
         id=node_id,

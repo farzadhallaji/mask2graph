@@ -25,7 +25,7 @@ def _load_mask(path: Path) -> np.ndarray:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="maskgraph")
+    parser = argparse.ArgumentParser(prog="mask2graph")
     sub = parser.add_subparsers(dest="command", required=True)
     p_extract = sub.add_parser("extract", help="Extract graph from mask")
     p_extract.add_argument("input", type=Path)
