@@ -7,9 +7,10 @@ from dataclasses import asdict, dataclass, field
 
 @dataclass
 class CleanupConfig:
-    fill_holes_max_size: int | None = None
-    remove_objects_max_size: int | None = None
-    connectivity: int | None = None
+    min_object_size: float = 0.0
+    max_hole_size: float = 0.0
+    max_hole_radius: float = 0.0
+    enabled: bool = True
 
 
 @dataclass
@@ -20,8 +21,14 @@ class SkeletonConfig:
 
 @dataclass
 class NormalizeConfig:
+    junction_dilation_iters: int = 0
     min_component_length: float = 0.0
     prune_spurs_below: float = 0.0
+    min_cycle_length: float = 0.0
+    max_cycle_area: float = 0.0
+    cycle_length_to_radius_ratio: float = 0.0
+    contract_short_edges_below: float = 0.0
+    normalization_max_iter: int = 10
     prune_iterations: int = 100
     contract_degree2: bool = True
 
@@ -53,12 +60,28 @@ class ExtractConfig:
     def validate(self, ndim: int) -> None:
         if ndim not in (2, 3):
             raise ValueError("ndim must be 2 or 3")
-        if self.cleanup.connectivity is not None and self.cleanup.connectivity <= 0:
-            raise ValueError("cleanup.connectivity must be positive when provided")
+        if self.cleanup.min_object_size < 0:
+            raise ValueError("cleanup.min_object_size must be >= 0")
+        if self.cleanup.max_hole_size < 0:
+            raise ValueError("cleanup.max_hole_size must be >= 0")
+        if self.cleanup.max_hole_radius < 0:
+            raise ValueError("cleanup.max_hole_radius must be >= 0")
+        if self.normalize.junction_dilation_iters < 0:
+            raise ValueError("normalize.junction_dilation_iters must be >= 0")
         if self.normalize.min_component_length < 0:
             raise ValueError("normalize.min_component_length must be >= 0")
         if self.normalize.prune_spurs_below < 0:
             raise ValueError("normalize.prune_spurs_below must be >= 0")
+        if self.normalize.min_cycle_length < 0:
+            raise ValueError("normalize.min_cycle_length must be >= 0")
+        if self.normalize.max_cycle_area < 0:
+            raise ValueError("normalize.max_cycle_area must be >= 0")
+        if self.normalize.cycle_length_to_radius_ratio < 0:
+            raise ValueError("normalize.cycle_length_to_radius_ratio must be >= 0")
+        if self.normalize.contract_short_edges_below < 0:
+            raise ValueError("normalize.contract_short_edges_below must be >= 0")
+        if self.normalize.normalization_max_iter < 0:
+            raise ValueError("normalize.normalization_max_iter must be >= 0")
         if self.normalize.prune_iterations < 0:
             raise ValueError("normalize.prune_iterations must be >= 0")
         if self.simplify.epsilon < 0:

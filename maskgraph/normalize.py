@@ -20,7 +20,42 @@ def normalize_graph(
 ) -> MaskGraph:
     nodes, edges = list(graph.nodes), list(graph.edges)
     nodes, edges = _remove_tiny_components(nodes, edges, normalize_config.min_component_length)
-    nodes, edges = _prune_spurs(nodes, edges, normalize_config.prune_spurs_below, normalize_config.prune_iterations)
+    max_iter = max(1, normalize_config.normalization_max_iter)
+    for _ in range(max_iter):
+        changed = False
+
+        nodes, edges, spurs_changed = _prune_spurs(
+            nodes,
+            edges,
+            normalize_config.prune_spurs_below,
+            normalize_config.prune_iterations,
+        )
+        changed |= spurs_changed
+
+        nodes, edges, cycles_changed = _remove_tiny_cycles(
+            nodes,
+            edges,
+            min_cycle_length=normalize_config.min_cycle_length,
+            max_cycle_area=normalize_config.max_cycle_area,
+            cycle_length_to_radius_ratio=normalize_config.cycle_length_to_radius_ratio,
+            spacing_dims=graph.meta.ndim,
+        )
+        changed |= cycles_changed
+
+        nodes, edges, contract_changed = _contract_short_internal_edges(
+            nodes,
+            edges,
+            normalize_config.contract_short_edges_below,
+        )
+        changed |= contract_changed
+
+        prev_counts = (len(nodes), len(edges))
+        nodes, edges = _remove_tiny_components(nodes, edges, normalize_config.min_component_length)
+        changed |= prev_counts != (len(nodes), len(edges))
+
+        if not changed:
+            break
+
     if normalize_config.contract_degree2:
         nodes, edges = _contract_degree2(nodes, edges)
     if simplify_config.enabled and simplify_config.epsilon > 0.0:
@@ -79,10 +114,11 @@ def _remove_tiny_components(nodes: list[Node], edges: list[Edge], min_len: float
 
 def _prune_spurs(
     nodes: list[Node], edges: list[Edge], threshold: float, max_iter: int
-) -> tuple[list[Node], list[Edge]]:
+) -> tuple[list[Node], list[Edge], bool]:
     if threshold <= 0.0 or max_iter <= 0:
-        return nodes, edges
+        return nodes, edges, False
     node_by_id = {n.id: n for n in nodes}
+    changed_any = False
     for _ in range(max_iter):
         changed = False
         deg = _node_degrees(nodes, edges)
@@ -106,7 +142,180 @@ def _prune_spurs(
         deg = _node_degrees(nodes, edges)
         nodes = [n for n in nodes if deg.get(n.id, 0) > 0 or n.type == "isolate"]
         node_by_id = {n.id: n for n in nodes}
-    return list(node_by_id.values()), edges
+        changed_any = True
+    return list(node_by_id.values()), edges, changed_any
+
+
+def _path_is_closed(edge: Edge) -> bool:
+    if len(edge.path_index) < 3:
+        return False
+    return bool(np.array_equal(edge.path_index[0], edge.path_index[-1]))
+
+
+def _polygon_area_2d(path_xyz: np.ndarray) -> float:
+    if len(path_xyz) < 4:
+        return 0.0
+    xy = path_xyz[:, :2]
+    x = xy[:, 0]
+    y = xy[:, 1]
+    return float(0.5 * abs(np.dot(x[:-1], y[1:]) - np.dot(y[:-1], x[1:])))
+
+
+def _cycle_radius(edge: Edge, node_by_id: dict[int, Node]) -> float:
+    candidates: list[float] = []
+    if edge.radius_median is not None:
+        candidates.append(float(edge.radius_median))
+    if edge.radius_mean is not None:
+        candidates.append(float(edge.radius_mean))
+    if edge.radius_profile is not None and len(edge.radius_profile):
+        candidates.append(float(np.median(edge.radius_profile)))
+    for node_id in (edge.u, edge.v):
+        node = node_by_id.get(node_id)
+        if node is None:
+            continue
+        if node.radius_median is not None:
+            candidates.append(float(node.radius_median))
+        if node.radius_mean is not None:
+            candidates.append(float(node.radius_mean))
+    return float(np.median(candidates)) if candidates else 0.0
+
+
+def _remove_tiny_cycles(
+    nodes: list[Node],
+    edges: list[Edge],
+    *,
+    min_cycle_length: float,
+    max_cycle_area: float,
+    cycle_length_to_radius_ratio: float,
+    spacing_dims: int,
+) -> tuple[list[Node], list[Edge], bool]:
+    if min_cycle_length <= 0.0 and max_cycle_area <= 0.0 and cycle_length_to_radius_ratio <= 0.0:
+        return nodes, edges, False
+
+    node_by_id = {n.id: n for n in nodes}
+    remove_edge_ids: set[int] = set()
+
+    for i, edge in enumerate(edges):
+        if not edge.is_self_loop and not _path_is_closed(edge):
+            continue
+
+        length_ok = min_cycle_length <= 0.0 or edge.length <= min_cycle_length
+        if not length_ok:
+            continue
+
+        area_ok = True
+        if max_cycle_area > 0.0 and spacing_dims == 2:
+            area_ok = _polygon_area_2d(edge.path_xyz) <= max_cycle_area
+        if not area_ok:
+            continue
+
+        radius_ok = True
+        if cycle_length_to_radius_ratio > 0.0:
+            radius = _cycle_radius(edge, node_by_id)
+            if radius <= 0.0:
+                radius_ok = False
+            else:
+                radius_ok = edge.length <= (cycle_length_to_radius_ratio * radius)
+        if not radius_ok:
+            continue
+
+        remove_edge_ids.add(i)
+
+    if not remove_edge_ids:
+        return nodes, edges, False
+
+    kept_edges = [e for i, e in enumerate(edges) if i not in remove_edge_ids]
+    deg = _node_degrees(nodes, kept_edges)
+    kept_nodes = [n for n in nodes if deg.get(n.id, 0) > 0 or n.type == "isolate"]
+    return kept_nodes, kept_edges, True
+
+
+def _contract_short_internal_edges(
+    nodes: list[Node],
+    edges: list[Edge],
+    threshold: float,
+) -> tuple[list[Node], list[Edge], bool]:
+    if threshold <= 0.0:
+        return nodes, edges, False
+
+    changed = False
+    while True:
+        node_by_id = {n.id: n for n in nodes}
+        deg = _node_degrees(nodes, edges)
+        target_idx: int | None = None
+        for i, edge in sorted(
+            enumerate(edges),
+            key=lambda pair: (
+                pair[1].length,
+                min(pair[1].u, pair[1].v),
+                max(pair[1].u, pair[1].v),
+                pair[1].id,
+            ),
+        ):
+            if edge.is_self_loop or edge.u == edge.v:
+                continue
+            if edge.length >= threshold:
+                continue
+            u_node = node_by_id.get(edge.u)
+            v_node = node_by_id.get(edge.v)
+            if u_node is None or v_node is None:
+                continue
+            if u_node.type == "endpoint" or v_node.type == "endpoint":
+                continue
+            if deg.get(edge.u, 0) <= 1 or deg.get(edge.v, 0) <= 1:
+                continue
+            target_idx = i
+            break
+
+        if target_idx is None:
+            break
+
+        nodes, edges = _contract_edge(nodes, edges, target_idx)
+        changed = True
+
+    return nodes, edges, changed
+
+
+def _merge_node_types(left: str, right: str) -> str:
+    if "junction" in (left, right):
+        return "junction"
+    if "cycle" in (left, right):
+        return "cycle"
+    if "endpoint" in (left, right):
+        return "endpoint"
+    return left
+
+
+def _contract_edge(nodes: list[Node], edges: list[Edge], edge_idx: int) -> tuple[list[Node], list[Edge]]:
+    edge = edges[edge_idx]
+    keep_id, drop_id = (edge.u, edge.v) if edge.u < edge.v else (edge.v, edge.u)
+    node_by_id = {n.id: n for n in nodes}
+    keep_node = node_by_id[keep_id]
+    drop_node = node_by_id[drop_id]
+
+    keep_weight = max(1, int(keep_node.voxel_count))
+    drop_weight = max(1, int(drop_node.voxel_count))
+    total_weight = keep_weight + drop_weight
+    keep_node.xyz = tuple(
+        ((keep_node.xyz[i] * keep_weight) + (drop_node.xyz[i] * drop_weight)) / total_weight for i in range(3)
+    )  # type: ignore[assignment]
+    keep_node.index = min(keep_node.index, drop_node.index)
+    keep_node.voxel_count = int(keep_node.voxel_count + drop_node.voxel_count)
+    keep_node.type = _merge_node_types(keep_node.type, drop_node.type)
+
+    new_edges: list[Edge] = []
+    for i, candidate in enumerate(edges):
+        if i == edge_idx:
+            continue
+        if candidate.u == drop_id:
+            candidate.u = keep_id
+        if candidate.v == drop_id:
+            candidate.v = keep_id
+        candidate.is_self_loop = candidate.u == candidate.v
+        new_edges.append(candidate)
+
+    new_nodes = [n for n in nodes if n.id != drop_id]
+    return new_nodes, new_edges
 
 
 def _node_degrees(nodes: list[Node], edges: list[Edge]) -> dict[int, int]:

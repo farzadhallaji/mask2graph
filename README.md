@@ -16,7 +16,7 @@ Most mask-to-graph pipelines lose loops, behave inconsistently at dense junction
 
 ## Visual pipeline
 
-Pipeline: `binary mask -> skeleton -> node/edge tracing -> normalized graph`.
+Pipeline: `binary mask -> conservative cleanup -> skeleton -> junction stabilization -> node/edge tracing -> iterative graph normalization`.
 
 Real-mask overlay notebook (Mass Roads): `mass_roads_graph_overlay.ipynb`.
 
@@ -58,6 +58,60 @@ cfg = ExtractConfig()
 graph = extract_graph(mask, config=cfg, spacing=(1.0, 1.0))
 payload = to_json(graph)
 ```
+
+## Conservative cleanup
+
+Cleanup is optional and topology-conservative by default. The default cleanup config is effectively no-op unless you opt in with thresholds.
+
+- removes tiny disconnected foreground components (`min_object_size`)
+- fills tiny enclosed background holes (`max_hole_size` and `max_hole_radius`)
+- uses full connectivity (8-neighbor in 2D, 26-neighbor in 3D)
+- uses physical units when `spacing` is provided
+
+Cleanup does not do branch separation, hole carving, global erosion/dilation, or aggressive morphology.
+Those are topology-editing operations and should be explicit downstream choices.
+
+```python
+from maskgraph import ExtractConfig
+
+cfg = ExtractConfig()
+cfg.cleanup.min_object_size = 4.0
+cfg.cleanup.max_hole_size = 16.0
+cfg.cleanup.max_hole_radius = 1.5
+```
+
+When `return_debug=True`, `DebugArtifacts.cleanup_report` provides counts and physical sizes/radii for auditable cleanup changes.
+
+## Graph-side artifact cleanup
+
+Residual topology artifacts are handled after tracing at the graph stage, not by aggressive mask morphology:
+
+- stabilizes junction neighborhoods by region-based node candidates (`junction_dilation_iters`)
+- prunes short spurs (`prune_spurs_below`)
+- removes tiny cycles (`min_cycle_length`, `max_cycle_area`, `cycle_length_to_radius_ratio`)
+- contracts short internal edges around unstable junctions (`contract_short_edges_below`)
+- iterates normalization until stable or `normalization_max_iter` is reached
+
+Default normalization values are conservative (mostly disabled) so behavior remains predictable unless users opt in.
+
+```python
+from maskgraph import ExtractConfig
+
+cfg = ExtractConfig()
+cfg.normalize.junction_dilation_iters = 1
+cfg.normalize.prune_spurs_below = 8.0
+cfg.normalize.min_cycle_length = 12.0
+cfg.normalize.max_cycle_area = 16.0
+cfg.normalize.cycle_length_to_radius_ratio = 8.0
+cfg.normalize.contract_short_edges_below = 2.0
+cfg.normalize.normalization_max_iter = 8
+```
+
+This split is intentional:
+
+- mask cleanup repairs likely annotation noise
+- graph cleanup removes residual skeletonization/tracing artifacts
+- topology-editing operators (carving/separation/opening/closing) are not part of default cleanup behavior
 
 ## Output schema
 

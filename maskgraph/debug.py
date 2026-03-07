@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -20,3 +22,8 @@ def save_debug_artifacts(artifacts: DebugArtifacts, debug_dir: str | Path) -> No
     np.save(path / "node_labels.npy", artifacts.node_labels)
     np.save(path / "pruned_skeleton.npy", artifacts.pruned_skeleton)
     np.save(path / "component_labels.npy", artifacts.component_labels)
+    if artifacts.cleanup_report is not None:
+        (path / "cleanup_report.json").write_text(
+            json.dumps(asdict(artifacts.cleanup_report), indent=2, sort_keys=True),
+            encoding="utf-8",
+        )

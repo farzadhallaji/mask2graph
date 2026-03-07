@@ -56,6 +56,15 @@ class GraphMeta:
 
 
 @dataclass
+class CleanupReport:
+    n_removed_objects: int
+    n_filled_holes: int
+    removed_object_sizes: list[float]
+    filled_hole_sizes: list[float]
+    filled_hole_radii: list[float]
+
+
+@dataclass
 class MaskGraph:
     nodes: list[Node]
     edges: list[Edge]
@@ -66,6 +75,7 @@ class MaskGraph:
 class DebugArtifacts:
     mask_input: NDArray[np.bool_]
     mask_processed: NDArray[np.bool_]
+    cleanup_report: CleanupReport | None
     skeleton: NDArray[np.bool_]
     degree_map: NDArray[np.int32]
     node_candidates: NDArray[np.bool_]

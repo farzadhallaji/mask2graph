@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.ndimage import binary_dilation, generate_binary_structure
 
 from .types import Node
 from .utils.connectivity import label_components
@@ -22,9 +23,25 @@ class LogicalNode:
 
 
 def node_candidates_from_degree(
-    skeleton: NDArray[np.bool_], degree_map: NDArray[np.int32]
+    skeleton: NDArray[np.bool_],
+    degree_map: NDArray[np.int32],
+    *,
+    junction_dilation_iters: int = 0,
 ) -> NDArray[np.bool_]:
-    return np.asarray(skeleton & (degree_map != 2), dtype=np.bool_)
+    junction_seed = np.asarray(skeleton & (degree_map >= 3), dtype=np.bool_)
+    endpoint_seed = np.asarray(skeleton & (degree_map == 1), dtype=np.bool_)
+    isolate_seed = np.asarray(skeleton & (degree_map == 0), dtype=np.bool_)
+
+    junction_zone = junction_seed
+    if junction_dilation_iters > 0 and np.any(junction_seed):
+        structure = generate_binary_structure(skeleton.ndim, skeleton.ndim)
+        junction_zone = np.asarray(
+            binary_dilation(junction_seed, structure=structure, iterations=junction_dilation_iters),
+            dtype=np.bool_,
+        )
+        junction_zone &= skeleton
+
+    return np.asarray(junction_zone | endpoint_seed | isolate_seed, dtype=np.bool_)
 
 
 def _node_type_for_cluster(cluster_degrees: NDArray[np.int32]) -> str:

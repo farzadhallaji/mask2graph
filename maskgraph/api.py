@@ -136,7 +136,12 @@ def extract_graph(
     mask_input, spacing_t = _validate_input(np.asarray(mask), spacing)
     cfg.validate(mask_input.ndim)
 
-    mask_processed = preprocess_mask(mask_input, cfg.cleanup)
+    mask_processed, cleanup_report = preprocess_mask(
+        mask_input,
+        cfg.cleanup,
+        spacing=spacing_t,
+        return_report=True,
+    )
     skeleton = skeletonize_mask(mask_processed, cfg.skeleton)
     degree_map = compute_degree_map(skeleton)
     raw: RawExtraction = _extract_raw_graph(
@@ -144,6 +149,7 @@ def extract_graph(
         degree_map=degree_map,
         spacing=spacing_t,
         float_decimals=cfg.determinism.float_decimals,
+        junction_dilation_iters=cfg.normalize.junction_dilation_iters,
     )
     update_edge_lengths(raw.edges)
     _estimate_radii(
@@ -172,6 +178,7 @@ def extract_graph(
     debug = DebugArtifacts(
         mask_input=mask_input,
         mask_processed=mask_processed,
+        cleanup_report=cleanup_report,
         skeleton=skeleton,
         degree_map=degree_map,
         node_candidates=raw.node_candidates,
@@ -215,6 +222,7 @@ def extract_raw_graph(
         degree_map=degree_map,
         spacing=spacing,
         float_decimals=cfg.determinism.float_decimals,
+        junction_dilation_iters=cfg.normalize.junction_dilation_iters,
     )
 
 

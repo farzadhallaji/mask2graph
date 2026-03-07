@@ -9,7 +9,7 @@ from .api import (
     preprocess_mask,
     skeletonize_mask,
 )
-from .config import ExtractConfig
+from .config import CleanupConfig, ExtractConfig
 from .serialize import from_json, to_json
 from .types import (
     DebugArtifacts,
@@ -24,6 +24,7 @@ from .types import (
 __all__ = [
     "DebugArtifacts",
     "Edge",
+    "CleanupConfig",
     "ExtractConfig",
     "ExtractionError",
     "GraphMeta",

@@ -138,8 +138,13 @@ def extract_raw_graph(
     degree_map: NDArray[np.int32],
     spacing: tuple[float, ...],
     float_decimals: int,
+    junction_dilation_iters: int = 0,
 ) -> RawExtraction:
-    node_candidates = node_candidates_from_degree(skeleton, degree_map)
+    node_candidates = node_candidates_from_degree(
+        skeleton,
+        degree_map,
+        junction_dilation_iters=junction_dilation_iters,
+    )
     logical_nodes, nodes, node_labels = merge_node_candidate_clusters(
         node_candidates, degree_map, spacing, float_decimals
     )
