@@ -1,6 +1,6 @@
 # maskgraph (alpha)
 
-Deterministically convert 2D/3D binary masks into topology-preserving geometric graphs (nodes, edges, radii, and metadata) for downstream analysis.
+Deterministically convert 2D/3D binary masks into geometric graphs (nodes, edges, radii, and metadata) with conservative defaults suitable for scientific and production workflows.
 
 `maskgraph` is currently **alpha**: it is usable and tested on representative synthetic and real masks, but APIs/config defaults may still evolve.
 
@@ -13,6 +13,15 @@ Most mask-to-graph pipelines lose loops, behave inconsistently at dense junction
 - loop-preserving extraction,
 - one API for both 2D and 3D masks,
 - optional debug artifacts for inspection.
+
+## Publish-ready contract
+
+`maskgraph` is designed around an explicit two-layer cleanup strategy:
+
+- **Layer 1 (mask)**: conservative, spacing-aware cleanup for likely annotation noise only
+- **Layer 2 (graph)**: iterative artifact cleanup after tracing (junction stabilization, spur/cycle cleanup, short-edge contraction)
+
+This keeps mask cleanup topology-conservative and moves topology edits to explicit graph-side operators.
 
 ## Visual pipeline
 
@@ -55,6 +64,10 @@ print(graph.nodes[0].type, graph.edges[0].length)
 from maskgraph import ExtractConfig, extract_graph, to_json
 
 cfg = ExtractConfig()
+cfg.cleanup.max_hole_size = 16.0
+cfg.cleanup.max_hole_radius = 1.5
+cfg.normalize.junction_dilation_iters = 1
+cfg.normalize.prune_spurs_below = 8.0
 graph = extract_graph(mask, config=cfg, spacing=(1.0, 1.0))
 payload = to_json(graph)
 ```
@@ -129,16 +142,6 @@ See `maskgraph/types.py` and `maskgraph/serialize.py` for exact fields.
 - `examples/example_2d_line_network.py`
 - `examples/example_2d_loop.py`
 - `examples/example_3d_branch.py`
-
-## Benchmarks
-
-Run:
-
-```bash
-python benchmarks/benchmark_extract.py
-```
-
-The benchmark currently reports 2D and 3D runtime/memory plus graph sizes on synthetic masks.
 
 ## Test status
 
