@@ -94,7 +94,7 @@ Run:
 python -m pytest -q
 ```
 
-CI runs tests on every push and pull request using GitHub Actions (`.github/workflows/ci.yml`).
+CI workflow setup is prepared, but GitHub Actions is not yet enabled in this repository push because the publishing token did not include `workflow` scope.
 
 ## Limitations (alpha)
 
