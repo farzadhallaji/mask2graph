@@ -8,12 +8,12 @@ from typing import Any
 
 import numpy as np
 
-from .types import Edge, GraphMeta, MaskGraph, Node, SerializationError
+from .types import Edge, GraphMeta, Mask2Graph, Node, SerializationError
 
 SCHEMA_VERSION = "1"
 
 
-def to_dict(graph: MaskGraph) -> dict[str, Any]:
+def to_dict(graph: Mask2Graph) -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
         "meta": {
@@ -51,11 +51,11 @@ def to_dict(graph: MaskGraph) -> dict[str, Any]:
     }
 
 
-def to_json(graph: MaskGraph) -> str:
+def to_json(graph: Mask2Graph) -> str:
     return json.dumps(to_dict(graph), sort_keys=True, separators=(",", ":"))
 
 
-def from_dict(payload: dict[str, Any]) -> MaskGraph:
+def from_dict(payload: dict[str, Any]) -> Mask2Graph:
     if payload.get("schema_version") != SCHEMA_VERSION:
         raise SerializationError("Unsupported schema version")
     try:
@@ -102,10 +102,10 @@ def from_dict(payload: dict[str, Any]) -> MaskGraph:
             )
     except Exception as exc:  # noqa: BLE001
         raise SerializationError(f"Invalid graph schema: {exc}") from exc
-    return MaskGraph(nodes=nodes, edges=edges, meta=meta)
+    return Mask2Graph(nodes=nodes, edges=edges, meta=meta)
 
 
-def from_json(raw: str) -> MaskGraph:
+def from_json(raw: str) -> Mask2Graph:
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:

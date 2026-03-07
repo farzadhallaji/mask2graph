@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .types import MaskGraph
+from .types import Mask2Graph
 
 if TYPE_CHECKING:
     import networkx as nx
@@ -18,13 +18,13 @@ def _to_list(value: Any) -> Any:
     return value
 
 
-def to_networkx(graph: MaskGraph, *, multigraph: bool = True) -> "nx.Graph":
-    """Convert a ``MaskGraph`` instance to a NetworkX graph.
+def to_networkx(graph: Mask2Graph, *, multigraph: bool = True) -> "nx.Graph":
+    """Convert a ``Mask2Graph`` instance to a NetworkX graph.
 
     Parameters
     ----------
     graph:
-        Input ``MaskGraph`` object.
+        Input ``Mask2Graph`` object.
     multigraph:
         When true (default), returns a ``networkx.MultiGraph`` to preserve
         parallel edges and self-loops with stable edge IDs.

@@ -17,7 +17,7 @@ from .types import (
     Edge,
     ExtractionError,
     GraphMeta,
-    MaskGraph,
+    Mask2Graph,
     Node,
     SerializationError,
 )
@@ -29,7 +29,7 @@ __all__ = [
     "ExtractConfig",
     "ExtractionError",
     "GraphMeta",
-    "MaskGraph",
+    "Mask2Graph",
     "Node",
     "SerializationError",
     "compute_degree_map",

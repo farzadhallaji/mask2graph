@@ -17,7 +17,7 @@ from .radius import estimate_radii as _estimate_radii
 from .radius import update_edge_lengths
 from .skeleton import skeletonize_mask
 from .trace import RawExtraction, extract_raw_graph as _extract_raw_graph
-from .types import DebugArtifacts, GraphMeta, MaskGraph
+from .types import DebugArtifacts, GraphMeta, Mask2Graph
 from .utils.hash import hash_array
 
 
@@ -46,7 +46,7 @@ def _validate_input(mask: NDArray[np.generic], spacing: tuple[float, ...] | None
     return np.asarray(mask != 0, dtype=np.bool_), tuple(float(v) for v in spacing)
 
 
-def _round_graph(graph: MaskGraph, decimals: int) -> None:
+def _round_graph(graph: Mask2Graph, decimals: int) -> None:
     for node in graph.nodes:
         node.xyz = tuple(round(float(v), decimals) for v in node.xyz)  # type: ignore[assignment]
         if node.radius_mean is not None:
@@ -95,7 +95,7 @@ def _enforce_edge_orientation(edge) -> None:
                 edge.radius_profile = edge.radius_profile[order]
 
 
-def _determinize(graph: MaskGraph, cfg: ExtractConfig) -> MaskGraph:
+def _determinize(graph: Mask2Graph, cfg: ExtractConfig) -> Mask2Graph:
     nodes = list(graph.nodes)
     edges = list(graph.edges)
 
@@ -131,7 +131,7 @@ def extract_graph(
     spacing: tuple[float, ...] | None = None,
     config: ExtractConfig | None = None,
     return_debug: bool = False,
-) -> MaskGraph | tuple[MaskGraph, DebugArtifacts]:
+) -> Mask2Graph | tuple[Mask2Graph, DebugArtifacts]:
     cfg = config or ExtractConfig()
     mask_input, spacing_t = _validate_input(np.asarray(mask), spacing)
     cfg.validate(mask_input.ndim)
@@ -169,7 +169,7 @@ def extract_graph(
         input_hash=hash_array(mask_input),
         processed_mask_hash=hash_array(mask_processed),
     )
-    graph = MaskGraph(nodes=raw.nodes, edges=raw.edges, meta=meta)
+    graph = Mask2Graph(nodes=raw.nodes, edges=raw.edges, meta=meta)
     graph = _normalize_graph(graph, normalize_config=cfg.normalize, simplify_config=cfg.simplify)
     graph = _determinize(graph, cfg)
 
@@ -189,12 +189,12 @@ def extract_graph(
     return graph, debug
 
 
-def normalize_graph(graph: MaskGraph, config: ExtractConfig) -> MaskGraph:
+def normalize_graph(graph: Mask2Graph, config: ExtractConfig) -> Mask2Graph:
     return _normalize_graph(graph, normalize_config=config.normalize, simplify_config=config.simplify)
 
 
 def estimate_radii(
-    graph: MaskGraph,
+    graph: Mask2Graph,
     *,
     node_labels: NDArray[np.int32],
     mask_processed: NDArray[np.bool_],

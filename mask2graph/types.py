@@ -65,7 +65,7 @@ class CleanupReport:
 
 
 @dataclass
-class MaskGraph:
+class Mask2Graph:
     nodes: list[Node]
     edges: list[Edge]
     meta: GraphMeta

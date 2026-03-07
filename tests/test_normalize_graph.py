@@ -4,7 +4,7 @@ import numpy as np
 
 from mask2graph.config import NormalizeConfig, SimplifyConfig
 from mask2graph.normalize import normalize_graph
-from mask2graph.types import Edge, GraphMeta, MaskGraph, Node
+from mask2graph.types import Edge, GraphMeta, Mask2Graph, Node
 
 
 def _meta(ndim: int = 2) -> GraphMeta:
@@ -55,7 +55,7 @@ def test_contract_short_internal_edge():
             voxel_length=2,
         ),
     ]
-    graph = MaskGraph(nodes=nodes, edges=edges, meta=_meta())
+    graph = Mask2Graph(nodes=nodes, edges=edges, meta=_meta())
     cfg = NormalizeConfig(
         contract_short_edges_below=1.0,
         contract_degree2=False,
@@ -82,7 +82,7 @@ def test_remove_tiny_cycle_with_length_area_radius_gates():
         radius_median=0.5,
         is_self_loop=True,
     )
-    graph = MaskGraph(nodes=[node], edges=[edge], meta=_meta())
+    graph = Mask2Graph(nodes=[node], edges=[edge], meta=_meta())
     cfg = NormalizeConfig(
         min_cycle_length=5.0,
         max_cycle_area=2.0,
@@ -109,7 +109,7 @@ def test_keep_cycle_when_radius_ratio_gate_fails():
         radius_median=0.5,
         is_self_loop=True,
     )
-    graph = MaskGraph(nodes=[node], edges=[edge], meta=_meta())
+    graph = Mask2Graph(nodes=[node], edges=[edge], meta=_meta())
     cfg = NormalizeConfig(
         min_cycle_length=5.0,
         max_cycle_area=2.0,

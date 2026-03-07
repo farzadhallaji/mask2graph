@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from mask2graph import ExtractConfig, extract_graph, to_networkx
-from mask2graph.types import Edge, MaskGraph
+from mask2graph.types import Edge, Mask2Graph
 
 nx = pytest.importorskip("networkx")
 
@@ -54,7 +54,7 @@ def test_to_networkx_multiedge_semantics():
     n1 = gnode(1, (1.0, 0.0, 0.0), (0, 1))
     e0 = gedge(0, 0, 1)
     e1 = gedge(1, 0, 1)
-    graph = MaskGraph(nodes=[n0, n1], edges=[e0, e1], meta=extract_graph(_line_mask()).meta)
+    graph = Mask2Graph(nodes=[n0, n1], edges=[e0, e1], meta=extract_graph(_line_mask()).meta)
 
     multi = to_networkx(graph, multigraph=True)
     simple = to_networkx(graph, multigraph=False)

@@ -93,7 +93,7 @@ nx_graph = to_networkx(graph, multigraph=True)
 print(nx_graph.number_of_nodes(), nx_graph.number_of_edges())
 ```
 
-`multigraph=True` preserves parallel edges and self-loops. Node and edge attributes include geometry and topology metadata from `MaskGraph`.
+`multigraph=True` preserves parallel edges and self-loops. Node and edge attributes include geometry and topology metadata from `Mask2Graph`.
 
 ## Output schema
 

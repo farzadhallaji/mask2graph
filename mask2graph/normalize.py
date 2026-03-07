@@ -8,16 +8,16 @@ import numpy as np
 
 from .config import NormalizeConfig, SimplifyConfig
 from .radius import edge_length
-from .types import Edge, MaskGraph, Node
+from .types import Edge, Mask2Graph, Node
 from .utils.rdp import simplify_path_with_indices
 
 
 def normalize_graph(
-    graph: MaskGraph,
+    graph: Mask2Graph,
     *,
     normalize_config: NormalizeConfig,
     simplify_config: SimplifyConfig,
-) -> MaskGraph:
+) -> Mask2Graph:
     nodes, edges = list(graph.nodes), list(graph.edges)
     nodes, edges = _remove_tiny_components(nodes, edges, normalize_config.min_component_length)
     max_iter = max(1, normalize_config.normalization_max_iter)
@@ -62,7 +62,7 @@ def normalize_graph(
         _simplify_edges(edges, simplify_config.epsilon)
     _reindex_nodes_edges(nodes, edges)
     _update_node_degrees(nodes, edges)
-    return MaskGraph(nodes=nodes, edges=edges, meta=graph.meta)
+    return Mask2Graph(nodes=nodes, edges=edges, meta=graph.meta)
 
 
 def _incident(edges: list[Edge]) -> dict[int, list[int]]:
