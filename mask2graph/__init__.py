@@ -10,17 +10,6 @@ from .api import (
     skeletonize_mask,
 )
 from .config import CleanupConfig, ExtractConfig
-from .edits import (
-    EditOptions,
-    EditResult,
-    EditSpec,
-    EditType,
-    generate_add_edits,
-    generate_cut_edits,
-    generate_preserve_edits,
-    generate_prune_edits,
-    generate_rewire_edits,
-)
 from .networkx_utils import to_networkx
 from .serialize import from_json, to_json
 from .types import (
@@ -36,10 +25,6 @@ from .types import (
 __all__ = [
     "DebugArtifacts",
     "Edge",
-    "EditOptions",
-    "EditResult",
-    "EditSpec",
-    "EditType",
     "CleanupConfig",
     "ExtractConfig",
     "ExtractionError",
@@ -51,11 +36,6 @@ __all__ = [
     "estimate_radii",
     "extract_graph",
     "extract_raw_graph",
-    "generate_add_edits",
-    "generate_cut_edits",
-    "generate_preserve_edits",
-    "generate_prune_edits",
-    "generate_rewire_edits",
     "from_json",
     "normalize_graph",
     "preprocess_mask",
