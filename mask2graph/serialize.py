@@ -44,6 +44,8 @@ def to_dict(graph: Mask2Graph) -> dict[str, Any]:
                 "radius_mean": e.radius_mean,
                 "radius_median": e.radius_median,
                 "radius_profile": None if e.radius_profile is None else e.radius_profile.tolist(),
+                "arclen_profile": None if e.arclen_profile is None else e.arclen_profile.tolist(),
+                "tangent_profile": None if e.tangent_profile is None else e.tangent_profile.tolist(),
                 "is_self_loop": bool(e.is_self_loop),
             }
             for e in graph.edges
@@ -85,6 +87,8 @@ def from_dict(payload: dict[str, Any]) -> Mask2Graph:
         edges = []
         for e in payload["edges"]:
             rp = e.get("radius_profile")
+            ap = e.get("arclen_profile")
+            tp = e.get("tangent_profile")
             edges.append(
                 Edge(
                     id=int(e["id"]),
@@ -97,6 +101,8 @@ def from_dict(payload: dict[str, Any]) -> Mask2Graph:
                     radius_mean=None if e["radius_mean"] is None else float(e["radius_mean"]),
                     radius_median=None if e["radius_median"] is None else float(e["radius_median"]),
                     radius_profile=None if rp is None else np.asarray(rp, dtype=np.float64),
+                    arclen_profile=None if ap is None else np.asarray(ap, dtype=np.float64),
+                    tangent_profile=None if tp is None else np.asarray(tp, dtype=np.float64),
                     is_self_loop=bool(e["is_self_loop"]),
                 )
             )

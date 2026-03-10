@@ -73,6 +73,8 @@ def to_networkx(graph: Mask2Graph, *, multigraph: bool = True) -> "nx.Graph":
             "radius_mean": None if edge.radius_mean is None else float(edge.radius_mean),
             "radius_median": None if edge.radius_median is None else float(edge.radius_median),
             "radius_profile": _to_list(edge.radius_profile),
+            "arclen_profile": _to_list(edge.arclen_profile),
+            "tangent_profile": _to_list(edge.tangent_profile),
             "is_self_loop": bool(edge.is_self_loop),
         }
         if multigraph:

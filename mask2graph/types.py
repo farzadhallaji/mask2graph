@@ -41,6 +41,8 @@ class Edge:
     radius_mean: float | None = None
     radius_median: float | None = None
     radius_profile: NDArray[np.float64] | None = None
+    arclen_profile: NDArray[np.float64] | None = None
+    tangent_profile: NDArray[np.float64] | None = None
     is_self_loop: bool = False
 
 
