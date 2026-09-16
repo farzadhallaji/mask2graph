@@ -22,6 +22,12 @@ def save_debug_artifacts(artifacts: DebugArtifacts, debug_dir: str | Path) -> No
     np.save(path / "node_labels.npy", artifacts.node_labels)
     np.save(path / "pruned_skeleton.npy", artifacts.pruned_skeleton)
     np.save(path / "component_labels.npy", artifacts.component_labels)
+    if artifacts.diagnostics is not None:
+        (path / "topology_diagnostics.json").write_text(
+            json.dumps(asdict(artifacts.diagnostics), indent=2, sort_keys=True), encoding="utf-8"
+        )
+    if artifacts.notes:
+        (path / "notes.json").write_text(json.dumps(artifacts.notes, indent=2, sort_keys=True), encoding="utf-8")
     if artifacts.cleanup_report is not None:
         (path / "cleanup_report.json").write_text(
             json.dumps(asdict(artifacts.cleanup_report), indent=2, sort_keys=True),

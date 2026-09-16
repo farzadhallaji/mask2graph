@@ -1,0 +1,95 @@
+schema_version: 1
+name: retinal_augmentation_demo
+
+input:
+  path: ../notebooks/data/retinal_binary_mask.gif
+  expected_ndim: 2
+  spacing: [1.0, 1.0]
+  foreground_value: 255
+  background_value: 0
+  require_only_configured_values: true
+  squeeze_singleton_axes: true
+  channel: null
+  npz_array_key: null
+
+extract:
+  cleanup:
+    min_object_size: 0.0
+    max_hole_size: 0.0
+    max_hole_radius: 0.0
+    enabled: true
+  skeleton:
+    method_2d: zhang
+    method_3d: lee
+  junction:
+    resolution: mst
+    dilation_iters: 0
+    supported_anchor: true
+  normalize:
+    junction_dilation_iters: 0
+    min_component_length: 0.0
+    prune_spurs_below: 0.0
+    min_cycle_length: 0.0
+    max_cycle_area: 0.0
+    cycle_length_to_radius_ratio: 0.0
+    contract_short_edges_below: 0.0
+    normalization_max_iter: 10
+    prune_iterations: 100
+    contract_degree2: true
+  geometry:
+    tangent_window: 2
+    compute_curvature: true
+  simplify:
+    enabled: true
+    epsilon: 1.0
+    method: rdp
+    protect_angle_degrees: 45.0
+    topology_guard: true
+    fallback_to_original: true
+  validation:
+    enabled: true
+    validate_coverage: true
+    validate_topology: true
+    validate_embedding: true
+    tolerance: 1.0e-9
+  export:
+    coordinate_mode: rationalized
+    max_denominator: 1000000
+    domain_margin: 1.0
+  determinism:
+    float_decimals: 6
+    sort_nodes: true
+    sort_edges: true
+
+augmentation:
+  enabled: true
+  seed: 1234
+  operations:
+    - type: rotate
+      angle_degrees: 30.0
+      center: bbox_center
+      axis_3d: null
+    - type: flip
+      axes: [x]
+      center: bbox_center
+    - type: central_crop
+      fraction: 0.70
+      keep_size: true
+
+visualization:
+  enabled: true
+  representation: embedded
+  show_nodes: false
+  dpi: 150
+  save_original_mask: true
+  save_graph_overlay: true
+  save_each_stage: true
+  save_sequence: true
+
+output:
+  run_dir: ../runs/retinal_augmentation_demo
+  overwrite: true
+  save_stage_graph_json: true
+  save_final_graph_json: true
+  save_min_ipd_json: true
+  min_ipd_name: retinal_augmented_crop

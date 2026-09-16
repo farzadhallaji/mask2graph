@@ -1,6 +1,6 @@
 # mask2graph
 
-`mask2graph` converts 2D/3D binary masks into deterministic geometric graphs (nodes, edges, radii, and metadata) for downstream analysis, simulation, and learning systems.
+`mask2graph` converts 2D/3D binary masks into deterministic topology graphs and validated straight-line embedded graphs/PSLGs, with radii, geometric profiles, provenance, and optional exact `min_ipd` export.
 
 <img width="1280" height="1278" alt="image" src="https://github.com/user-attachments/assets/823138e9-a4a2-4c28-93b6-72dfed814737" />
 
@@ -16,9 +16,12 @@ Most mask-to-graph pipelines fail at dense junctions, lose loops, or produce uns
 
 ## Pipeline
 
-`binary mask -> conservative mask cleanup -> skeleton -> junction stabilization -> node/edge tracing -> iterative graph normalization`
+`binary mask -> conservative cleanup -> 2D/3D skeleton -> supported/MST junction resolution -> maximal branch tracing -> topology diagnostics -> optional graph cleanup -> non-destructive geometric simplification -> global embedded-graph validation -> PSLG / min_ipd export`
 
-Real-mask overlay notebook (Mass Roads): `mass_roads_graph_overlay.ipynb`.
+Interactive graph-augmentation notebook: [`notebooks/mask_graph_augmentation_demo.ipynb`](notebooks/mask_graph_augmentation_demo.ipynb).
+It shows the binary mask, extracted graph, graph rotation, graph flip, and geometric graph crop in sequence.
+
+Legacy real-mask overlay notebook (Mass Roads): `mass_roads_graph_overlay.ipynb`.
 
 ## Install
 
@@ -39,6 +42,39 @@ Install optional NetworkX interoperability dependency:
 ```bash
 python -m pip install -e ".[interop]"
 ```
+
+Install visualization/notebook support:
+
+```bash
+python -m pip install -e ".[viz]"
+# or, for JupyterLab as well:
+python -m pip install -e ".[notebook]"
+```
+
+
+## Canonical paper-facing run: one YAML
+
+Paper behavior is controlled by one strict self-contained YAML file. The CLI has
+no behavioral flags:
+
+```bash
+mask2graph configs/retinal_augmentation_demo.yaml
+```
+
+The same configuration can be called from Python with a single path:
+
+```python
+from mask2graph import run_experiment
+run = run_experiment("configs/retinal_augmentation_demo.yaml")
+```
+
+Unknown or missing keys and wrong YAML scalar types fail before extraction. Every
+run archives `source.yaml`, `resolved.yaml`, `environment.json`, a first-party
+`code_snapshot/`, configured stage outputs, and a run summary. See
+`CONFIG_POLICY.md` and `IMPLEMENTATION_RULES.md`.
+
+The low-level Python functions below remain available for library use and unit
+tests; they are not a second paper configuration path.
 
 ## Quickstart
 
@@ -61,9 +97,38 @@ payload = to_json(graph)
 print(len(graph.nodes), len(graph.edges), len(payload))
 ```
 
+For the complete topology + straight-line pipeline:
+
+```python
+from mask2graph import mask_to_graph, graph_to_min_ipd
+
+result = mask_to_graph(mask, spacing=(1.0, 1.0), config=cfg)
+print(result.diagnostics.logical_beta0, result.diagnostics.logical_beta1)
+print(len(result.embedded_graph.vertices), len(result.embedded_graph.segments))
+
+instance = graph_to_min_ipd(
+    result.embedded_graph,
+    config=cfg.export,
+    name="sample",
+)
+```
+
+`extract_graph(...)` remains the backward-compatible topology-graph API. `mask_to_graph(...)` is the unified API and returns both the topology graph (full skeleton branch provenance retained) and the validated straight-line embedded graph.
+
+## Visual notebook: mask -> graph -> rotate -> flip -> crop
+
+The canonical notebook is `notebooks/mask_graph_augmentation_demo.ipynb`. It
+loads `configs/retinal_augmentation_demo.yaml`, calls `run_experiment(...)`, and
+displays the archived figures for the original mask, extracted graph, rotation,
+flip, crop, and full sequence. It does not duplicate angles, crop fractions,
+spacing, seed, simplification, or export policy in notebook cells.
+
+To change behavior, copy/edit the YAML. For final minimum-segment PSLG runs, set
+`extract.simplify.method: optimal` in YAML.
+
 ## Configuration reference
 
-`ExtractConfig` has five groups: `cleanup`, `skeleton`, `normalize`, `simplify`, and `determinism`.
+`ExtractConfig` has nine groups: `cleanup`, `skeleton`, `junction`, `normalize`, `geometry`, `simplify`, `validation`, `export`, and `determinism`.
 
 All size/length/area thresholds are interpreted in the same units as `spacing` passed to `extract_graph(...)`.
 If `spacing=(1, 1)` they behave like pixel units; with physical spacing they behave in physical units.
@@ -122,17 +187,35 @@ Practical guidance:
 - If micro-loops remain:
   - tune `min_cycle_length`, then `max_cycle_area`, then `cycle_length_to_radius_ratio`.
 
+### `junction` (`JunctionConfig`)
+
+- `resolution="mst"` (default): records a deterministic minimum-spanning tree inside each clustered junction support.
+- `dilation_iters`: optional junction-zone stabilization.
+
+Logical junction coordinates are always supported skeleton lattice samples, never floating centroids. Original support samples and MST edges are retained as provenance.
+
+### `geometry` (`GeometryConfig`)
+
+Controls spacing-aware arclength, tangent, turning-angle and curvature profiles. EDT radius profiles and min/median/mean/max statistics are retained independently.
+
 ### `simplify` (`SimplifyConfig`)
 
-Optional geometric simplification of edge polylines.
+Non-destructive straight-line simplification. The original `path_index`/`path_xyz` is never discarded.
 
-- `enabled` (`bool`, default `False`): toggles simplification.
-- `epsilon` (`float`, default `0.0`): simplification tolerance.
+- `enabled` (`bool`, default `True`)
+- `epsilon` (`float`, default `1.0`)
+- `method`: `"optimal"` (minimum-segment DAG), `"rdp"`, or `"none"`
+- `protect_angle_degrees`: protects high-turn samples from shortcuts
+- `topology_guard`: validates the resulting global embedded graph
+- `fallback_to_original`: falls back to unsimplified branch geometry if simplification alone creates an invalid embedding
 
-Practical guidance:
+### `validation` (`ValidationConfig`)
 
-- Use only when you need lighter polylines for export/visualization.
-- Keep disabled if exact sampled geometry is important for downstream metrics.
+Controls branch-coverage, topology and embedded-geometry checks. With destructive graph cleanup disabled, the logical graph must preserve the junction-cleaned component count and cycle rank.
+
+### `export` (`ExportConfig`)
+
+Controls exact `min_ipd` coordinate conversion: `lattice_exact`, `scaled_exact`, or bounded-denominator `rationalized`, together with the automatically generated convex-domain margin.
 
 ### `determinism` (`DeterminismConfig`)
 
@@ -208,9 +291,10 @@ print(nx_graph.number_of_nodes(), nx_graph.number_of_edges())
 Serialized payload (`to_json`) includes:
 
 - `schema_version`
-- `meta`: version, ndim, shape, spacing, config snapshot, input hashes
-- `nodes[]`: ids, geometry, topology labels, optional radii
-- `edges[]`: connectivity, path geometry/index, lengths, optional radii/profile, loop flag
+- `meta`: version, ndim, shape, spacing, config snapshot, input/config/processed-mask/graph hashes
+- `diagnostics`: raw/cleaned/logical/embedded component and cycle-rank data plus coverage/simplification status
+- `nodes[]`: supported geometry, topology labels, junction support/MST provenance, boundary flags, radius statistics
+- `edges[]`: full original branch path, non-destructive simplified path, lengths/tortuosity, radius/arclength/tangent/angle/curvature profiles, loop/provenance fields
 
 See `mask2graph/types.py` and `mask2graph/serialize.py` for exact fields.
 
@@ -239,3 +323,41 @@ If this project helps your work, cite via `CITATION.cff`.
 ## License
 
 MIT (`LICENSE`).
+
+## Graph-to-graph augmentation
+
+The extracted topology/embedded graph pair can be augmented directly without
+rasterization or reskeletonization:
+
+```python
+from mask2graph import (
+    mask_to_graph, rotate_graph, flip_graph, translate_graph, crop_graph_box,
+)
+
+result = mask_to_graph(mask)
+result = rotate_graph(result, 90)
+result = flip_graph(result, "x")
+result = crop_graph_box(result, bounds=(32, 288, 16, 272), keep_size=True)
+```
+
+Rigid transforms preserve topology and transform both graph representations with
+the same matrix.  Cropping instead clips complete original branch paths, creates
+explicit crop-boundary endpoints, recomputes branch geometry, and regenerates the
+straight embedded graph.  Source pixel/voxel indices remain provenance and are
+never fabricated after non-grid transforms.
+
+For reproducible stochastic augmentation:
+
+```python
+from mask2graph import GraphAugmentationPipeline, RandomFlip, RandomRotation, RandomCrop
+
+pipeline = GraphAugmentationPipeline([
+    RandomFlip(("x", "y"), 0.5),
+    RandomRotation((0, 90, 180, 270)),
+    RandomCrop((256, 256), keep_size=True),
+])
+augmented = pipeline(result, seed=1234)
+```
+
+See [`docs/AUGMENTATION.md`](docs/AUGMENTATION.md) for exactness, cropping,
+provenance, 3D rotations, and validation semantics.

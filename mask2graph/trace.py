@@ -1,4 +1,4 @@
-"""Edge tracing from clustered nodes on skeletons."""
+"""Edge tracing from supported logical nodes on 2D/3D skeletons."""
 
 from __future__ import annotations
 
@@ -20,6 +20,8 @@ class RawExtraction:
     node_candidates: NDArray[np.bool_]
     node_labels: NDArray[np.int32]
     component_labels: NDArray[np.int32]
+    expected_trace_segments: int = 0
+    covered_trace_segments: int = 0
 
 
 def _segment_key(a: tuple[int, ...], b: tuple[int, ...], shape: tuple[int, ...]) -> tuple[int, int]:
@@ -28,16 +30,35 @@ def _segment_key(a: tuple[int, ...], b: tuple[int, ...], shape: tuple[int, ...])
     return (af, bf) if af < bf else (bf, af)
 
 
+def _expected_trace_segment_keys(skeleton: NDArray[np.bool_], node_labels: NDArray[np.int32]) -> set[tuple[int, int]]:
+    """Skeleton adjacencies to be owned by exactly one branch.
+
+    Adjacencies wholly inside the same logical-node support are intentionally
+    excluded: they are represented by the junction-support MST provenance.
+    """
+    out: set[tuple[int, int]] = set()
+    shape = tuple(int(v) for v in skeleton.shape)
+    for row in np.argwhere(skeleton):
+        a = tuple(int(v) for v in row)
+        la = int(node_labels[a])
+        for b in iter_neighbors(a, shape):
+            if not skeleton[b] or not a < b:
+                continue
+            lb = int(node_labels[b])
+            if la > 0 and la == lb:
+                continue
+            out.add(_segment_key(a, b, shape))
+    return out
+
+
 def _trace_from_seed(
     *,
     skeleton: NDArray[np.bool_],
     node_labels: NDArray[np.int32],
-    start_node_id: int,
-    start_rep: tuple[int, ...],
+    start_node: LogicalNode,
     boundary_voxel: tuple[int, ...],
     seed_voxel: tuple[int, ...],
-    label_to_node_id: dict[int, int],
-    node_id_to_rep: dict[int, tuple[int, ...]],
+    label_to_logical: dict[int, LogicalNode],
     visited_segments: set[tuple[int, int]],
     spacing: tuple[float, ...],
 ) -> Edge:
@@ -51,11 +72,11 @@ def _trace_from_seed(
     prev = boundary_voxel
     cur = seed_voxel
 
-    end_node_id: int | None = None
+    end_node: LogicalNode | None = None
     while True:
         cur_label = int(node_labels[cur])
         if cur_label > 0:
-            end_node_id = label_to_node_id[cur_label]
+            end_node = label_to_logical[cur_label]
             break
 
         chain.append(cur)
@@ -72,19 +93,27 @@ def _trace_from_seed(
         visited_segments.add(key)
         prev, cur = cur, nxt
 
-    end_rep = node_id_to_rep[int(end_node_id)]
-    path_indices = [start_rep, *chain, end_rep]
-    path_index = np.asarray(path_indices, dtype=np.int32)
+    assert end_node is not None
+    # Junction interiors are intentionally contracted to one supported lattice
+    # anchor.  The MST is retained as provenance/topology certification, but it
+    # is not expanded independently into every incident branch (which would
+    # duplicate/overlap junction-internal geometry in the output PSLG).
+    path_indices = [start_node.representative, *chain, end_node.representative]
+    dedup: list[tuple[int, ...]] = []
+    for p in path_indices:
+        if not dedup or p != dedup[-1]:
+            dedup.append(p)
+    path_index = np.asarray(dedup, dtype=np.int32)
     path_xyz = indices_to_xyz(path_index, spacing)
     return Edge(
         id=-1,
-        u=start_node_id,
-        v=int(end_node_id),
+        u=start_node.temp_id,
+        v=end_node.temp_id,
         path_xyz=path_xyz,
         path_index=path_index,
         length=0.0,
         voxel_length=int(len(path_index)),
-        is_self_loop=start_node_id == int(end_node_id),
+        is_self_loop=start_node.temp_id == end_node.temp_id,
     )
 
 
@@ -92,11 +121,11 @@ def _cycle_edge_for_component(
     component_mask: NDArray[np.bool_],
     spacing: tuple[float, ...],
     float_decimals: int,
-) -> tuple[Node, Edge]:
+) -> tuple[Node, Edge, set[tuple[int, int]]]:
     coords = np.argwhere(component_mask)
     start = min(tuple(int(v) for v in row) for row in coords)
     neighbors = [n for n in iter_neighbors(start, component_mask.shape) if component_mask[n]]
-    if len(neighbors) < 2:
+    if len(neighbors) != 2:
         raise ExtractionError("pure cycle component does not have degree-2 structure")
     neighbors.sort()
     prev = start
@@ -119,6 +148,7 @@ def _cycle_edge_for_component(
 
     node = synthetic_cycle_node(start, spacing, float_decimals)
     node.voxel_count = int(np.count_nonzero(component_mask))
+    node.support_indices = coords.astype(np.int32, copy=True)
     path_index = np.asarray([start, *chain, start], dtype=np.int32)
     edge = Edge(
         id=-1,
@@ -130,7 +160,7 @@ def _cycle_edge_for_component(
         voxel_length=int(len(path_index)),
         is_self_loop=True,
     )
-    return node, edge
+    return node, edge, seen
 
 
 def extract_raw_graph(
@@ -139,6 +169,7 @@ def extract_raw_graph(
     spacing: tuple[float, ...],
     float_decimals: int,
     junction_dilation_iters: int = 0,
+    junction_resolution: str = "mst",
 ) -> RawExtraction:
     node_candidates = node_candidates_from_degree(
         skeleton,
@@ -146,13 +177,13 @@ def extract_raw_graph(
         junction_dilation_iters=junction_dilation_iters,
     )
     logical_nodes, nodes, node_labels = merge_node_candidate_clusters(
-        node_candidates, degree_map, spacing, float_decimals
+        node_candidates, degree_map, spacing, float_decimals, resolution=junction_resolution
     )
-    label_to_node_id = {ln.label: ln.temp_id for ln in logical_nodes}
-    node_id_to_rep = {n.id: n.index for n in nodes}
+    label_to_logical = {ln.label: ln for ln in logical_nodes}
 
     edges: list[Edge] = []
     visited_segments: set[tuple[int, int]] = set()
+    junction_artifact_segments: set[tuple[int, int]] = set()
 
     for ln in sorted(logical_nodes, key=lambda x: x.representative):
         cluster = {tuple(int(v) for v in row) for row in ln.voxels}
@@ -162,42 +193,60 @@ def extract_raw_graph(
                 key = _segment_key(bv, seed, skeleton.shape)
                 if key in visited_segments:
                     continue
+                before = set(visited_segments)
                 edge = _trace_from_seed(
                     skeleton=skeleton,
                     node_labels=node_labels,
-                    start_node_id=ln.temp_id,
-                    start_rep=ln.representative,
+                    start_node=ln,
                     boundary_voxel=bv,
                     seed_voxel=seed,
-                    label_to_node_id=label_to_node_id,
-                    node_id_to_rep=node_id_to_rep,
+                    label_to_logical=label_to_logical,
                     visited_segments=visited_segments,
                     spacing=spacing,
                 )
-                edges.append(edge)
+                # Collapsing a thick junction support can turn a raw digital
+                # micro-cycle into the two-edge walk rep->p->rep.  This is a
+                # junction raster artifact, not a realizable geometric cycle.
+                # Treat its external adjacencies as part of junction cleanup.
+                unique_path = {tuple(int(v) for v in row) for row in edge.path_index}
+                if edge.is_self_loop and len(unique_path) < 3:
+                    junction_artifact_segments |= (visited_segments - before)
+                else:
+                    edges.append(edge)
 
     component_labels, n_components = label_components(skeleton)
     for comp_id in range(1, n_components + 1):
         comp_mask = component_labels == comp_id
         if np.any(node_candidates & comp_mask):
             continue
-        cycle_node, cycle_edge = _cycle_edge_for_component(comp_mask, spacing, float_decimals)
+        cycle_node, cycle_edge, cycle_seen = _cycle_edge_for_component(comp_mask, spacing, float_decimals)
         cycle_node.id = len(nodes)
         cycle_edge.u = cycle_node.id
         cycle_edge.v = cycle_node.id
         nodes.append(cycle_node)
         edges.append(cycle_edge)
+        visited_segments |= cycle_seen
 
     for edge in edges:
         edge.path_xyz = indices_to_xyz(edge.path_index, spacing)
         edge.voxel_length = int(len(edge.path_index))
     _update_node_degrees(nodes, edges)
+
+    expected = _expected_trace_segment_keys(skeleton, node_labels) - junction_artifact_segments
+    covered = visited_segments - junction_artifact_segments
+    if covered != expected:
+        missing = len(expected - covered)
+        extra = len(covered - expected)
+        raise ExtractionError(f"branch coverage invariant failed: missing={missing} extra={extra}")
+
     return RawExtraction(
         nodes=nodes,
         edges=edges,
         node_candidates=node_candidates,
         node_labels=node_labels,
         component_labels=component_labels,
+        expected_trace_segments=len(expected),
+        covered_trace_segments=len(covered),
     )
 
 

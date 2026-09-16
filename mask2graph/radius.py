@@ -36,10 +36,14 @@ def estimate_radii(
         edge.radius_profile = samples
         edge.radius_mean = float(samples.mean()) if len(samples) else None
         edge.radius_median = float(np.median(samples)) if len(samples) else None
+        edge.radius_min = float(np.min(samples)) if len(samples) else None
+        edge.radius_max = float(np.max(samples)) if len(samples) else None
 
     for node in nodes:
-        if node.type == "cycle":
-            samples = np.array([dt[node.index]], dtype=np.float64)
+        if node.support_indices is not None and len(node.support_indices):
+            samples = np.array(
+                [dt[tuple(int(v) for v in c)] for c in node.support_indices], dtype=np.float64
+            )
         else:
             label = int(node_labels[node.index]) if node_labels.shape == mask_processed.shape else 0
             if label <= 0:
@@ -49,4 +53,6 @@ def estimate_radii(
                 samples = np.array([dt[tuple(int(v) for v in c)] for c in coords], dtype=np.float64)
         node.radius_mean = float(samples.mean()) if len(samples) else None
         node.radius_median = float(np.median(samples)) if len(samples) else None
+        node.radius_min = float(np.min(samples)) if len(samples) else None
+        node.radius_max = float(np.max(samples)) if len(samples) else None
     return dt

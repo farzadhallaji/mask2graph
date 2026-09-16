@@ -9,7 +9,8 @@ import numpy as np
 from .config import NormalizeConfig, SimplifyConfig
 from .radius import edge_length
 from .types import Edge, Mask2Graph, Node
-from .utils.rdp import simplify_path_with_indices
+from .simplify import simplify_graph_edges
+from .geometry import update_geometry_profiles
 
 
 def normalize_graph(
@@ -58,8 +59,8 @@ def normalize_graph(
 
     if normalize_config.contract_degree2:
         nodes, edges = _contract_degree2(nodes, edges)
-    if simplify_config.enabled and simplify_config.epsilon > 0.0:
-        _simplify_edges(edges, simplify_config.epsilon)
+    update_geometry_profiles(edges)
+    simplify_graph_edges(edges, simplify_config)
     _reindex_nodes_edges(nodes, edges)
     _update_node_degrees(nodes, edges)
     return Mask2Graph(nodes=nodes, edges=edges, meta=graph.meta)
@@ -260,7 +261,7 @@ def _contract_short_internal_edges(
             v_node = node_by_id.get(edge.v)
             if u_node is None or v_node is None:
                 continue
-            if u_node.type == "endpoint" or v_node.type == "endpoint":
+            if u_node.type in ("endpoint", "boundary_endpoint") or v_node.type in ("endpoint", "boundary_endpoint"):
                 continue
             if deg.get(edge.u, 0) <= 1 or deg.get(edge.v, 0) <= 1:
                 continue
@@ -281,6 +282,8 @@ def _merge_node_types(left: str, right: str) -> str:
         return "junction"
     if "cycle" in (left, right):
         return "cycle"
+    if "boundary_endpoint" in (left, right):
+        return "boundary_endpoint"
     if "endpoint" in (left, right):
         return "endpoint"
     return left
@@ -338,7 +341,10 @@ def _contract_degree2(nodes: list[Node], edges: list[Edge]) -> tuple[list[Node],
         for node in sorted(nodes, key=lambda n: n.id):
             if deg.get(node.id, 0) != 2:
                 continue
-            if node.type in ("cycle", "isolate"):
+            # Extraction already contracts ordinary degree-2 skeleton samples
+            # into edge paths.  Never erase semantic endpoints/junctions merely
+            # because later cleanup leaves them with graph degree two.
+            if node.type not in ("degree2", "geometry", "corner"):
                 continue
             edge_ids = inc.get(node.id, [])
             if len(edge_ids) != 2:
@@ -402,19 +408,6 @@ def _merge_through_node(e1: Edge, e2: Edge, node_id: int) -> Edge:
         is_self_loop=u == v,
     )
     return edge
-
-
-def _simplify_edges(edges: list[Edge], epsilon: float) -> None:
-    for edge in edges:
-        keep_idx = simplify_path_with_indices(edge.path_xyz, epsilon)
-        edge.path_xyz = edge.path_xyz[keep_idx]
-        edge.path_index = edge.path_index[keep_idx]
-        if edge.radius_profile is not None:
-            edge.radius_profile = edge.radius_profile[keep_idx]
-            edge.radius_mean = float(np.mean(edge.radius_profile)) if len(edge.radius_profile) else None
-            edge.radius_median = float(np.median(edge.radius_profile)) if len(edge.radius_profile) else None
-        edge.length = edge_length(edge.path_xyz)
-        edge.voxel_length = int(len(edge.path_index))
 
 
 def _reindex_nodes_edges(nodes: list[Node], edges: list[Edge]) -> None:
