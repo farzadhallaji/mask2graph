@@ -1,5 +1,7 @@
 # mask2graph
 
+Current unified release: **1.4.0**. The package has one supported `mask2graph` import tree, one package-version source, and one YAML-driven paper execution path.
+
 `mask2graph` converts 2D/3D binary masks into deterministic topology graphs and validated straight-line embedded graphs/PSLGs, with radii, geometric profiles, provenance, and optional exact `min_ipd` export.
 
 <img width="1280" height="1278" alt="image" src="https://github.com/user-attachments/assets/823138e9-a4a2-4c28-93b6-72dfed814737" />
@@ -29,6 +31,12 @@ From source:
 
 ```bash
 python -m pip install -e .
+```
+
+From a release wheel:
+
+```bash
+python -m pip install mask2graph-1.4.0-py3-none-any.whl
 ```
 
 From GitHub:

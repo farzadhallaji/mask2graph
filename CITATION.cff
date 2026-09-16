@@ -1,10 +1,12 @@
 cff-version: 1.2.0
 message: "If you use mask2graph, please cite this software."
 title: "mask2graph"
-version: "1.0.0"
+version: "1.4.0"
+date-released: 2026-09-16
 type: software
 authors:
   - family-names: "Hallaji"
     given-names: "Farzad"
 repository-code: "https://github.com/farzadhallaji/mask2graph"
+url: "https://github.com/farzadhallaji/mask2graph"
 license: "MIT"

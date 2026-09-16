@@ -18,6 +18,7 @@ def normalize_graph(
     *,
     normalize_config: NormalizeConfig,
     simplify_config: SimplifyConfig,
+    simplify: bool = True,
 ) -> Mask2Graph:
     nodes, edges = list(graph.nodes), list(graph.edges)
     nodes, edges = _remove_tiny_components(nodes, edges, normalize_config.min_component_length)
@@ -60,7 +61,8 @@ def normalize_graph(
     if normalize_config.contract_degree2:
         nodes, edges = _contract_degree2(nodes, edges)
     update_geometry_profiles(edges)
-    simplify_graph_edges(edges, simplify_config)
+    if simplify:
+        simplify_graph_edges(edges, simplify_config)
     _reindex_nodes_edges(nodes, edges)
     _update_node_degrees(nodes, edges)
     return Mask2Graph(nodes=nodes, edges=edges, meta=graph.meta)

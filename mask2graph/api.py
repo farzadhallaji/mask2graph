@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from importlib.metadata import version as pkg_version
 import hashlib
 import json
 
 import numpy as np
 from numpy.typing import NDArray
+
+from ._version import __version__
 
 from .config import ExtractConfig, default_spacing
 from .degree import compute_degree_map
@@ -31,10 +32,8 @@ from .validate import (
 
 
 def _library_version() -> str:
-    try:
-        return pkg_version("mask2graph")
-    except Exception:  # noqa: BLE001
-        return "1.2.0"
+    """Return the release version from the package's single version source."""
+    return __version__
 
 
 def _validate_input(mask: NDArray[np.generic], spacing: tuple[float, ...] | None) -> tuple[NDArray[np.bool_], tuple[float, ...]]:
@@ -229,7 +228,7 @@ def _extract_pipeline(
         covered_trace_segments=raw.covered_trace_segments,
         junction_mst_edge_count=raw_mst_edge_count,
     )
-    graph = _normalize_graph(graph, normalize_config=cfg.normalize, simplify_config=cfg.simplify)
+    graph = _normalize_graph(graph, normalize_config=cfg.normalize, simplify_config=cfg.simplify, simplify=False)
     graph = _determinize(graph, cfg)
     update_logical_diagnostics(diag, graph)
     diag.cleanup_topology_edit_enabled = _topology_edit_enabled(cfg)
@@ -281,24 +280,22 @@ def _extract_pipeline(
 
 
 def _edge_error(edge) -> float:
-    from .simplify import point_segment_distance
+    from .simplify import max_subpath_error
 
-    if edge.simplified_xyz is None or len(edge.simplified_xyz) < 2:
+    if edge.simplified_indices is None or edge.simplified_xyz is None or len(edge.simplified_xyz) < 2:
         return 0.0
-    # Simplified samples are selected from path_index; map them back in order.
     pos: list[int] = []
     start = 0
     for sample in edge.simplified_indices:
-        target = tuple(int(v) for v in sample)
-        found = next((i for i in range(start, len(edge.path_index)) if tuple(int(v) for v in edge.path_index[i]) == target), None)
-        if found is None:
+        matches = np.flatnonzero(np.all(edge.path_index[start:] == sample, axis=1))
+        if len(matches) == 0:
             continue
+        found = start + int(matches[0])
         pos.append(found)
         start = found + 1
     err = 0.0
     for a, b in zip(pos[:-1], pos[1:]):
-        for k in range(a + 1, b):
-            err = max(err, point_segment_distance(edge.path_xyz[k], edge.path_xyz[a], edge.path_xyz[b]))
+        err = max(err, max_subpath_error(edge.path_xyz, int(a), int(b)))
     return float(err)
 
 
@@ -333,7 +330,7 @@ def mask_to_graph(
 
 
 def normalize_graph(graph: Mask2Graph, config: ExtractConfig) -> Mask2Graph:
-    out = _normalize_graph(graph, normalize_config=config.normalize, simplify_config=config.simplify)
+    out = _normalize_graph(graph, normalize_config=config.normalize, simplify_config=config.simplify, simplify=False)
     update_geometry_profiles(out.edges, tangent_window=config.geometry.tangent_window, compute_curvature=config.geometry.compute_curvature)
     simplify_graph_edges(out.edges, config.simplify)
     return out

@@ -17,23 +17,45 @@ def _point_segment_distance(point: NDArray[np.float64], a: NDArray[np.float64], 
     return float(np.linalg.norm(point - proj))
 
 
+def _point_segment_distances(points: NDArray[np.float64], a: NDArray[np.float64], b: NDArray[np.float64]) -> NDArray[np.float64]:
+    if len(points) == 0:
+        return np.zeros(0, dtype=np.float64)
+    ab = b - a
+    denom = float(np.dot(ab, ab))
+    if denom == 0.0:
+        return np.linalg.norm(points - a, axis=1).astype(np.float64, copy=False)
+    t = np.clip(((points - a) @ ab) / denom, 0.0, 1.0)
+    proj = a + t[:, None] * ab
+    return np.linalg.norm(points - proj, axis=1).astype(np.float64, copy=False)
+
+
 def _rdp_indices(points: NDArray[np.float64], epsilon: float) -> list[int]:
-    if len(points) <= 2:
-        return list(range(len(points)))
-    start = points[0]
-    end = points[-1]
-    max_dist = -1.0
-    max_idx = 0
-    for i in range(1, len(points) - 1):
-        d = _point_segment_distance(points[i], start, end)
-        if d > max_dist:
-            max_dist = d
-            max_idx = i
-    if max_dist <= epsilon:
-        return [0, len(points) - 1]
-    left = _rdp_indices(points[: max_idx + 1], epsilon)
-    right = _rdp_indices(points[max_idx:], epsilon)
-    return left[:-1] + [i + max_idx for i in right]
+    n = len(points)
+    if n <= 2:
+        return list(range(n))
+
+    keep = {0, n - 1}
+    stack = [(0, n - 1)]
+    while stack:
+        start_idx, end_idx = stack.pop()
+        if end_idx <= start_idx + 1:
+            continue
+        distances = _point_segment_distances(
+            points[start_idx + 1 : end_idx],
+            points[start_idx],
+            points[end_idx],
+        )
+        if len(distances) == 0:
+            continue
+        rel_idx = int(np.argmax(distances))
+        max_dist = float(distances[rel_idx])
+        if max_dist <= epsilon:
+            continue
+        split_idx = start_idx + 1 + rel_idx
+        keep.add(split_idx)
+        stack.append((split_idx, end_idx))
+        stack.append((start_idx, split_idx))
+    return sorted(keep)
 
 
 def simplify_path(points: NDArray[np.float64], epsilon: float) -> NDArray[np.float64]:

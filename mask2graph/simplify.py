@@ -10,6 +10,8 @@ from .config import SimplifyConfig
 from .types import Edge
 from .utils.rdp import simplify_path_with_indices
 
+_EXACT_OPTIMAL_MAX_SAMPLES = 512
+
 
 def point_segment_distance(p: np.ndarray, a: np.ndarray, b: np.ndarray) -> float:
     ab = b - a
@@ -25,7 +27,14 @@ def max_subpath_error(path: np.ndarray, i: int, j: int) -> float:
     if j <= i + 1:
         return 0.0
     a, b = path[i], path[j]
-    return max(point_segment_distance(path[k], a, b) for k in range(i + 1, j))
+    points = np.asarray(path[i + 1 : j], dtype=np.float64)
+    ab = b - a
+    den = float(np.dot(ab, ab))
+    if den <= 0.0:
+        return float(np.linalg.norm(points - a, axis=1).max())
+    t = np.clip(((points - a) @ ab) / den, 0.0, 1.0)
+    q = a + t[:, None] * ab
+    return float(np.linalg.norm(points - q, axis=1).max())
 
 
 def _protected_indices(edge: Edge, degrees: float) -> set[int]:
@@ -33,6 +42,27 @@ def _protected_indices(edge: Edge, degrees: float) -> set[int]:
         return set()
     threshold = math.radians(float(degrees))
     return {i for i, a in enumerate(edge.turning_angle_profile) if float(a) >= threshold}
+
+
+def _rdp_keep_with_protected(path: np.ndarray, epsilon: float, protected: set[int]) -> np.ndarray:
+    n = len(path)
+    anchors = [0, *(i for i in sorted(protected) if 0 < i < n - 1), n - 1]
+    keep: list[int] = []
+    for start, end in zip(anchors[:-1], anchors[1:]):
+        local = simplify_path_with_indices(path[start : end + 1], epsilon).astype(np.int32, copy=False)
+        shifted = [int(i) + start for i in local]
+        if keep:
+            shifted = shifted[1:]
+        keep.extend(shifted)
+    return np.asarray(keep, dtype=np.int32)
+
+
+def _protected_prefix(protected: set[int], n: int) -> np.ndarray:
+    prefix = np.zeros(n + 1, dtype=np.int32)
+    for idx in protected:
+        if 0 < idx < n - 1:
+            prefix[idx + 1] = 1
+    return np.cumsum(prefix, dtype=np.int32)
 
 
 def optimal_keep_indices(edge: Edge, epsilon: float, protect_angle_degrees: float = 0.0) -> np.ndarray:
@@ -58,6 +88,10 @@ def optimal_keep_indices(edge: Edge, epsilon: float, protect_angle_degrees: floa
         return keep
 
     protected = _protected_indices(edge, protect_angle_degrees)
+    if n > _EXACT_OPTIMAL_MAX_SAMPLES:
+        return _rdp_keep_with_protected(path, epsilon, protected)
+
+    protected_prefix = _protected_prefix(protected, n)
     best = [10**9] * n
     prev = [-1] * n
     best[0] = 0
@@ -65,7 +99,7 @@ def optimal_keep_indices(edge: Edge, epsilon: float, protect_angle_degrees: floa
         for i in range(j - 1, -1, -1):
             if best[i] >= 10**9:
                 continue
-            if any(i < k < j for k in protected):
+            if int(protected_prefix[j] - protected_prefix[i + 1]) > 0:
                 continue
             if max_subpath_error(path, i, j) > epsilon:
                 continue

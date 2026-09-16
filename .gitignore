@@ -16,5 +16,3 @@ tmp/
 
 runs/
 *.executed.ipynb
-
-IMPLEMENTATION_RULES.md

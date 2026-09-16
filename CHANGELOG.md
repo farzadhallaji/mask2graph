@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 - 2026-09-16 — unified public package release
+
+- consolidated mask extraction, topology graphs, embedded graphs, augmentation, geometric cropping, visualization, strict YAML experiments, and `min_ipd` export into one supported `mask2graph` package;
+- made `mask2graph._version.__version__` the single package-version source and aligned package metadata/citation/release checks;
+- added release-quality wheel/sdist packaging, `python -m mask2graph`, `mask2graph --version`, and release validation/build scripts;
+- added the repository-wide implementation contract and release-readiness checks;
+- kept the YAML experiment runner as the only paper-facing behavioral CLI path.
+
 ## 1.3.0 - 2026-09-16 — strict paper-run configuration
 
 - added one self-contained strict YAML as the only paper-facing CLI behavior source;
@@ -10,6 +18,13 @@
 - added reproducibility/config-policy tests and paper-setup sanity script;
 - batched graph plotting with matplotlib collections for large graph visualization.
 
+## 1.2.0 - 2026-09-16 — graph augmentation
+
+- added graph-to-graph 2D/3D rotation, reflection, translation, axis permutation, transform composition/inversion, and deterministic random augmentation pipelines;
+- added geometric full-polyline box clipping with boundary endpoints, radius interpolation, multiple fragments, cycle handling, provenance, and keep-size crop-as-translation;
+- added explicit source/current raster-index validity so transformed or synthetic coordinates are never silently rounded into fake pixel/voxel provenance;
+- added exact-transform/grid-alignment metadata and rationalization-error reporting in `min_ipd` exports;
+- added rigid/crop topology validation and augmentation regression tests.
 
 ## 1.1.0 - 2026-09-16
 
@@ -50,16 +65,3 @@ First stable release:
 - JSON serialization/deserialization with schema versioning,
 - NetworkX interoperability via `to_networkx(...)`,
 - expanded test coverage for extraction, normalization, and conversion utilities.
-
-## Graph augmentation layer
-
-- Added graph-to-graph 2D/3D rotation, reflection, translation, axis permutation,
-  transform composition/inversion, and deterministic random augmentation pipelines.
-- Added geometric full-polyline box clipping with boundary endpoints, radius
-  interpolation, multiple fragments, cycle handling, provenance, and keep-size
-  crop-as-translation.
-- Added explicit source/current raster-index validity so transformed or synthetic
-  coordinates are never silently rounded into fake pixel/voxel provenance.
-- Added exact-transform/grid-alignment metadata and rationalization-error reporting
-  in `min_ipd` exports.
-- Added rigid/crop topology validation and an augmentation regression suite.

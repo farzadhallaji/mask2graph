@@ -1,5 +1,7 @@
 """Public package exports for mask2graph."""
 
+from ._version import __version__
+
 from .api import (
     compute_degree_map,
     estimate_radii,
@@ -102,7 +104,7 @@ def graph_to_min_ipd(embedded_graph, *, domain=None, config=None, name="mask2gra
 
 
 __all__ = [
-    "CleanupConfig", "DebugArtifacts", "DeterminismConfig", "Edge", "EmbeddedGraph",
+    "__version__", "CleanupConfig", "DebugArtifacts", "DeterminismConfig", "Edge", "EmbeddedGraph",
     "EmbeddedSegment", "EmbeddedVertex", "ExportConfig", "ExtractConfig", "ExtractionError",
     "GeometryConfig", "GraphAugmentationPipeline", "GraphMeta", "GraphTransform", "JunctionConfig",
     "Mask2Graph", "MaskGraphResult", "Node", "NormalizeConfig", "RandomCrop", "RandomFlip",
